@@ -1,12 +1,17 @@
 #include <node.h>
 #include <wiringPi.h>
-#include<stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 // #define PIN 3
-#define MAX_TIME 85
-#define DHT11PIN 7
-#define DELAY_TIME 500
-int dht11_val[5] = { 0,0,0,0,0 };
+#define MAXTIMINGS 85
+#define MAX_TRY 5
+static int DHTPIN = 7;
+static int dht22_dat[5] = {0,0,0,0,0};
+
 namespace dht11 {
 
 using v8::FunctionCallbackInfo;
@@ -16,113 +21,94 @@ using v8::Object;
 using v8::String;
 using v8::Value;
 
-int dht11_read_val(){
-	int returnValue = 0;
+static uint8_t sizecvt(const int read)
+{
+  /* digitalRead() and friends from wiringpi are defined as returning a value
+  < 256. However, they are returned as int() types. This is a safety function */
 
-	uint8_t lststate = HIGH;
-	uint8_t counter = 0;
-	uint8_t j = 0, i = 0;
-	float farenheit = 0;
+  if (read > 255 || read < 0)
+  {
+    printf("Invalid data from wiringPi library\n");
+    exit(EXIT_FAILURE);
+  }
+  return (uint8_t)read;
+}
 
-	// ***
-	// *** Initialize the values
-	// ***
-	for (i = 0; i < 5; i++)
-	{
-		dht11_val[i] = 0;
-	}
+static int read_dht22_dat()
+{
+  uint8_t laststate = HIGH;
+  uint8_t counter = 0;
+  uint8_t j = 0, i;
 
-	// ***
-	// *** Signal the sensor to send data
-	// ***
-	pinMode(DHT11PIN, OUTPUT);
-	digitalWrite(DHT11PIN, LOW);
+  dht22_dat[0] = dht22_dat[1] = dht22_dat[2] = dht22_dat[3] = dht22_dat[4] = 0;
 
-	// ***
-	// *** Datasheet states that we should wait 18ms
-	// ***
-	delay(18);
+  // pull pin down for 18 milliseconds
+  pinMode(DHTPIN, OUTPUT);
+  digitalWrite(DHTPIN, HIGH);
+  delay(10);
+  digitalWrite(DHTPIN, LOW);
+  delay(18);
+  // then pull it up for 40 microseconds
+  digitalWrite(DHTPIN, HIGH);
+  delayMicroseconds(40); 
+  // prepare to read the pin
+  pinMode(DHTPIN, INPUT);
 
-	// ***
-	// *** Set the pin to high and switch to input mode
-	// ***
-	// digitalWrite(DHT11PIN, HIGH);
-	// delayMicroseconds(40);
-	pinMode(DHT11PIN, INPUT);
+  // detect change and read data
+  for ( i=0; i< MAXTIMINGS; i++) {
+    counter = 0;
+    while (sizecvt(digitalRead(DHTPIN)) == laststate) {
+      counter++;
+      delayMicroseconds(2);
+      if (counter == 255) {
+        break;
+      }
+    }
+    laststate = sizecvt(digitalRead(DHTPIN));
 
-	// ***
-	// *** Get the bits
-	// ***
-	for (i = 0; i < MAX_TIME; i++)
-	{
-		counter = 0;
-		while (digitalRead(DHT11PIN) == lststate)
-		{
-			counter++;
-			delayMicroseconds(1);
+    if (counter == 255) break;
 
-			if (counter == 255)
-			{
-				break;
-			}
-		}
+    // ignore first 3 transitions
+    if ((i >= 4) && (i%2 == 0)) {
+      // shove each bit into the storage bytes
+      dht22_dat[j/8] <<= 1;
+      if (counter > 16)
+        dht22_dat[j/8] |= 1;
+      j++;
+    }
+  }
 
-		lststate = digitalRead(DHT11PIN);
+  // check we read 40 bits (8bit x 5 ) + verify checksum in the last byte
+  // print it out if data is good
+  if ((j >= 40) && 
+      (dht22_dat[4] == ((dht22_dat[0] + dht22_dat[1] + dht22_dat[2] + dht22_dat[3]) & 0xFF)) ) {
+    //     float t, h;
+    //     h = (float)dht22_dat[0] * 256 + (float)dht22_dat[1];
+    //     h /= 10;
+    //     t = (float)(dht22_dat[2] & 0x7F)* 256 + (float)dht22_dat[3];
+    //     t /= 10.0;
+    //     if ((dht22_dat[2] & 0x80) != 0)  t *= -1;
 
-		if (counter == 255)
-		{
-			break;
-		}
 
-		// ***
-		// *** Top 3 transitions are ignored
-		// ***
-		if ((i >= 4) && (i % 2 == 0))
-		{
-			dht11_val[j / 8] <<= 1;
-
-			if (counter > 16)
-			{
-				dht11_val[j / 8] |= 1;
-			}
-
-			j++;
-		}
-	}
-
-	// ***
-	// *** Verify checksum and print the verified data
-	// ***
-	if ((j >= 40) && (dht11_val[4] == ((dht11_val[0] + dht11_val[1] + dht11_val[2] + dht11_val[3]) & 0xFF)))
-	{
-		farenheit = dht11_val[2] * 9. / 5. + 32;
-		// printf("Humidity = %d.%d %% Temperature = %d.%d *C (%.1f *F)\n", dht11_val[0], dht11_val[1], dht11_val[2], dht11_val[3], farenheit);
-		returnValue = 1;
-	}
-	else
-	{
-		// printf("Invalid Data!!\n");
-		returnValue = 0;
-	}
-
-	return returnValue;
+    // printf("Humidity = %.2f %% Temperature = %.2f *C \n", h, t );
+    return 1;
+  }
+  else
+  {
+    printf("Data not good, skip\n");
+    return 0;
+  }
 }
 
 void Method(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  // int sound = 0;
-  // int i;
-  // for(i = 0;i<50;i++){
-  // 	if(digitalRead(PIN)== LOW){
-  // sound = 1;
-  // break;
-  //
-  // elayMicroseconds(100);
-  // }
-  int i = MAX_TIME;
-  while(i-- > 0 && !dht11_read_val());
-  float h = (float)(dht11_val[0] + dht11_val[1]/10);
-  float t = (float)(dht11_val[2] + dht11_val[3]/10);
+  int i = MAX_TRY;
+  while(i-- > 0 && !read_dht22_dat());
+  float t, h;
+   h = (float)dht22_dat[0] * 256 + (float)dht22_dat[1];
+	h /= 10;
+    t = (float)(dht22_dat[2] & 0x7F)* 256 + (float)dht22_dat[3];
+    t /= 10.0;
   Local<v8::Array> ret = v8::Array::New(isolate,2);
   ret->Set(0, v8::Number::New(isolate,t));
   ret->Set(1, v8::Number::New(isolate,h));
@@ -130,10 +116,16 @@ void Method(const FunctionCallbackInfo<Value>& args) {
 }
 void init(Local<Object> exports) {
   NODE_SET_METHOD(exports, "data", Method);
-  wiringPiSetup();
-//   pinMode(PIN,INPUT);
+if (wiringPiSetup () == -1)
+    exit(EXIT_FAILURE) ;
+	
+  if (setuid(getuid()) < 0)
+  {
+    perror("Dropping privileges failed\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
-	NODE_MODULE(fc_04, init)
+	NODE_MODULE(dht_22, init)
 
-}  // namespace demo
+}  // namespace end

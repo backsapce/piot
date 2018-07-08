@@ -1,0 +1,27 @@
+# build and run
+
+```
+make all
+```
+
+dth22 connect
+
+vcc: 5v
+gcc:
+data: gpio.7
+
+EPD display
+
+  * VCC    ->    3.3
+  * GND    ->    GND
+  * DIN    ->    MOSI
+  * CLK    ->    SCLK
+  * CS     ->    24 (Physical, BCM: CE0, 8)
+  * D/C    ->    22 (Physical, BCM: 25)
+  * RES    ->    11 (Physical, BCM: 17)
+  * BUSY   ->    18 (Physical, BCM: 24)
+
+
+# deps
+
+  require node.js v10+,because i port V8-API change to use N-api,but node.js v8.*,N-api is not stable(by the way,in v10,some api also not stable)

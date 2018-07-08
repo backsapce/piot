@@ -24,6 +24,6 @@ function begin(){
     task = setInterval(()=>{
         let data =  dht22.data()
         console.log('dht22 data',data)
-        client.publish('/sensors/dht22',Buffer.from(JSON.stringify(data)))
-    },2000)
+        client.publish('/iot/sensors/dht22',Buffer.from(JSON.stringify(data)))
+    },1000)
 }
