@@ -1,25 +1,17 @@
-#include <node.h>
-#include <wiringPi.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
+#include "../common/common.h"
 #include <sys/types.h>
-#include <unistd.h>
+
+
+
+
+
+namespace dht11 {
 
 // #define PIN 3
 #define MAXTIMINGS 85
 #define MAX_TRY 5
-static int DHTPIN = 7;
+static int DHTPIN = 4;
 static int dht22_dat[5] = {0,0,0,0,0};
-
-namespace dht11 {
-
-using v8::FunctionCallbackInfo;
-using v8::Isolate;
-using v8::Local;
-using v8::Object;
-using v8::String;
-using v8::Value;
 
 static uint8_t sizecvt(const int read)
 {
@@ -82,15 +74,6 @@ static int read_dht22_dat()
   // print it out if data is good
   if ((j >= 40) && 
       (dht22_dat[4] == ((dht22_dat[0] + dht22_dat[1] + dht22_dat[2] + dht22_dat[3]) & 0xFF)) ) {
-    //     float t, h;
-    //     h = (float)dht22_dat[0] * 256 + (float)dht22_dat[1];
-    //     h /= 10;
-    //     t = (float)(dht22_dat[2] & 0x7F)* 256 + (float)dht22_dat[3];
-    //     t /= 10.0;
-    //     if ((dht22_dat[2] & 0x80) != 0)  t *= -1;
-
-
-    // printf("Humidity = %.2f %% Temperature = %.2f *C \n", h, t );
     return 1;
   }
   else
@@ -100,8 +83,11 @@ static int read_dht22_dat()
   }
 }
 
-void Method(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
+napi_value Method(napi_env env, napi_callback_info info) {
+  napi_status status;
+  napi_value ret;
+  napi_value nh;
+  napi_value nt;
   int i = MAX_TRY;
   while(i-- > 0 && !read_dht22_dat());
   float t, h;
@@ -109,14 +95,27 @@ void Method(const FunctionCallbackInfo<Value>& args) {
 	h /= 10;
     t = (float)(dht22_dat[2] & 0x7F)* 256 + (float)dht22_dat[3];
     t /= 10.0;
-  Local<v8::Array> ret = v8::Array::New(isolate,2);
-  ret->Set(0, v8::Number::New(isolate,t));
-  ret->Set(1, v8::Number::New(isolate,h));
-  args.GetReturnValue().Set(ret);
+
+  status = napi_create_double(env, h, &nh);
+  assert(status == napi_ok);
+  status = napi_create_double(env, t, &nt);
+  assert(status == napi_ok);
+  status = napi_create_array_with_length(env, 2, &ret);
+  assert(status == napi_ok);
+
+  status = napi_set_property(env, ret,creat_array_index(env,0), nt);
+  assert(status == napi_ok);
+  status = napi_set_property(env, ret,creat_array_index(env,1), nh);
+  assert(status == napi_ok);
+  return ret;
 }
-void init(Local<Object> exports) {
-  NODE_SET_METHOD(exports, "data", Method);
-if (wiringPiSetup () == -1)
+napi_value  Init(napi_env env, napi_value exports) {
+  napi_status status;
+  napi_property_descriptor desc =
+    {"data", NULL, Method, NULL, NULL, NULL, napi_default, NULL};
+  status = napi_define_properties(env, exports, 1, &desc);
+  assert(status == napi_ok);
+  if (wiringPiSetupGpio () == -1)
     exit(EXIT_FAILURE) ;
 	
   if (setuid(getuid()) < 0)
@@ -124,8 +123,9 @@ if (wiringPiSetup () == -1)
     perror("Dropping privileges failed\n");
     exit(EXIT_FAILURE);
   }
+  return exports;
 }
 
-	NODE_MODULE(dht_22, init)
+	NAPI_MODULE(NODE_GYP_MODULE_NAME, Init)
 
-}  // namespace end
+}  // namespace dht11 end

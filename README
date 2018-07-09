@@ -4,11 +4,17 @@
 make all
 ```
 
+# run program
+
+```
+make run
+```
+
 dth22 connect
 
 vcc: 5v
-gcc:
-data: gpio.7
+gcc: GND
+data: BCM-4
 
 EPD display
 
@@ -21,6 +27,12 @@ EPD display
   * RES    ->    11 (Physical, BCM: 17)
   * BUSY   ->    18 (Physical, BCM: 24)
 
+dart wz-s 
+
+v: 5v/3v
+r: BCM-10
+t: BCM-8
+g: GND
 
 # deps
 

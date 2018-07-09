@@ -3,7 +3,7 @@
     {
       "libraries":["-lwiringPi"],
       "target_name": "dht22",
-      "sources": [ "dht22.cc" ]
+      "sources": [ "dht22.cc","../common/common.cc" ]
     }
   ]
 }
