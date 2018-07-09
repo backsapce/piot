@@ -14,6 +14,12 @@ make all
 make run
 ```
 
+# run as deamon
+
+```
+make run-back
+```
+
 dth22 connect
 
 vcc: 5v
@@ -40,4 +46,4 @@ g: GND
 
 # deps
 
-  require node.js v10+,because i port V8-API change to use N-api,but node.js v8.*,N-api is not stable(by the way,in v10,some api also not stable)
+  require node.js v10+,because i port V8-API change to use N-api,but node.js v8.*,N-api is not stable(by the way,in v10,some api also not stable too)

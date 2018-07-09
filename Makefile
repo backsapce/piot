@@ -12,3 +12,6 @@ wzs:
 
 run: 
 	node index.js
+
+run-back:
+	nohup node index.js &
