@@ -1,3 +1,7 @@
+# deps
+
+you need debian or win10-iot system image run on raspberry pi 3 and install node.js v10+
+
 # build and run
 
 ```
